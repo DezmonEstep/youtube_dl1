@@ -1,0 +1,14 @@
+decorator==5.2.1
+ImageIO==2.37.3
+imageio-ffmpeg==0.6.0
+moviepy==2.2.1
+numpy==2.2.6
+pillow==11.3.0
+pip==22.3.1
+proglog==0.1.12
+python-dotenv==1.2.2
+setuptools==65.5.0
+tqdm==4.67.3
+google-api-python-client>=2.0.0
+yt-dlp==2026.03.17
+streamlit
