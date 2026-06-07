@@ -2,7 +2,7 @@ imageio-ffmpeg==0.6.0
 moviepy==2.2.1
 python-dotenv==1.2.2
 google-api-python-client>=2.0.0
-yt-dlp==2026.03.17
+yt-dlp
 streamlit
 numpy
 pillow

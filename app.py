@@ -19,7 +19,15 @@ def run_ytdl_download(urls, is_playlist=False):
     ydl_opts = {
     'format': 'bestaudio/best',
     'outtmpl': os.path.join(SAVE_PATH, '%(title)s.%(ext)s'),
-    'cookiefile': 'cookies.txt', 
+    'cookiefile': 'cookies.txt',  # Keep this if you have a fresh cookies file!
+    
+    # 🌟 CRUCIAL EXTRA ADDITION TO FIX THE "VIDEO UNAVAILABLE" BUG:
+    'extractor_args': {
+        'youtube': {
+            'client': ['web', 'ios'],
+        }
+    },
+    
     'postprocessors': [{
         'key': 'FFmpegExtractAudio',
         'preferredcodec': 'mp3',
