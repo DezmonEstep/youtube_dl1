@@ -3,38 +3,37 @@ import yt_dlp
 import os
 import glob
 
+
+
 st.title("🎵 Universal MP3 Downloader")
-st.write("Download individual tracks or entire playlists directly to MP3.")
 
-# Create two tabs for separate download modes
-tab1, tab2 = st.tabs(["🎥 Single Videos / Links", "🎼 Entire Playlist"])
+# 1. Initialize persistent memory architecture across server reruns
+if 'downloaded_tracks' not in st.session_state:
+    st.session_state.downloaded_tracks = []
 
-# Directory configuration
 SAVE_PATH = "temp_downloads"
 
-# Core yt-dlp downloader helper function
 def run_ytdl_download(urls, is_playlist=False):
     os.makedirs(SAVE_PATH, exist_ok=True)
     
     ydl_opts = {
-        'format': 'bestaudio/best',
-        'outtmpl': os.path.join(SAVE_PATH, '%(title)s.%(ext)s'),
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
-        'ignoreerrors': True,
-    }
-    
-    # If downloading a full playlist link, let yt-dlp manage the recursion natively
-    if is_playlist:
-        ydl_opts['noplaylist'] = False
-    else:
-        ydl_opts['noplaylist'] = True
+    'format': 'bestaudio/best',
+    'outtmpl': os.path.join(SAVE_PATH, '%(title)s.%(ext)s'),
+    'cookiefile': 'cookies.txt', 
+    'postprocessors': [{
+        'key': 'FFmpegExtractAudio',
+        'preferredcodec': 'mp3',
+        'preferredquality': '192',
+    }],
+    'ignoreerrors': True,
+}
+    ydl_opts['noplaylist'] = not is_playlist
 
     status_text = st.empty()
     progress_bar = st.progress(0)
+    
+    # Clear memory storage before a fresh download run
+    st.session_state.downloaded_tracks = []
     
     total_items = len(urls)
     for idx, url in enumerate(urls):
@@ -43,17 +42,41 @@ def run_ytdl_download(urls, is_playlist=False):
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
         except Exception as e:
-            st.warning(f"Failed to process URL: {url}")
+            st.warning(f"Failed to process: {url}")
         progress_bar.progress((idx + 1) / total_items)
         
-    status_text.text("Extraction complete! Aggregating files...")
+    status_text.text("Extraction phase complete! Verifying files...")
     
-    # Locate generated MP3 tracks
-    mp3_files = glob.glob(os.path.join(SAVE_PATH, "*.mp3"))
-    
-    if mp3_files:
-        st.success(f"Successfully processed audio tracks!")
-        for file_path in mp3_files:
+    # Find files and save directly to persistent memory
+    found_files = glob.glob(os.path.join(SAVE_PATH, "*.mp3"))
+    st.session_state.downloaded_tracks = found_files
+
+# --- UI TABS ---
+tab1, tab2 = st.tabs(["🎥 Single Videos", "🎼 Entire Playlist"])
+
+with tab1:
+    single_input = st.text_area("Paste video URLs (one per line):", key="single_url_box")
+    if st.button("Download Videos"):
+        video_list = [url.strip() for url in single_input.split('\n') if url.strip()]
+        if video_list:
+            run_ytdl_download(video_list, is_playlist=False)
+        else:
+            st.error("Please enter a link.")
+
+with tab2:
+    playlist_input = st.text_input("Paste the YouTube Playlist URL:", key="playlist_url_box")
+    if st.button("Extract Playlist"):
+        if playlist_input.strip():
+            run_ytdl_download([playlist_input.strip()], is_playlist=True)
+        else:
+            st.error("Please enter a playlist link.")
+
+# --- RENDER DOWNLOAD BUTTONS FROM STATE MEMORY ---
+# This block stays visible even during button clicks/reruns!
+if st.session_state.downloaded_tracks:
+    st.success("Tracks ready for local acquisition!")
+    for file_path in st.session_state.downloaded_tracks:
+        if os.path.exists(file_path): # Verify file didn't disappear
             file_name = os.path.basename(file_path)
             with open(file_path, "rb") as f:
                 st.download_button(
@@ -61,41 +84,5 @@ def run_ytdl_download(urls, is_playlist=False):
                     data=f,
                     file_name=file_name,
                     mime="audio/mp3",
-                    key=file_name # Unique key tracking for Streamlit loops
+                    key=f"dl_{file_name}"
                 )
-            # Delete file locally on server after browser attachment to maintain disc space
-            os.remove(file_path)
-    else:
-        st.error("No valid MP3 files could be extracted.")
-
-# --- TAB 1: SINGLE VIDEOS ---
-with tab1:
-    st.subheader("Download Individual Videos")
-    single_input = st.text_area(
-        "Paste video URLs (one per line):", 
-        height=150, 
-        placeholder="https://www.youtube.com/watch?v=...\nhttps://youtu.be/..."
-    )
-    
-    if st.button("Download Videos", key="btn_single"):
-        if not single_input.strip():
-            st.error("Please enter at least one video URL.")
-        else:
-            video_list = [url.strip() for url in single_input.split('\n') if url.strip()]
-            run_ytdl_download(video_list, is_playlist=False)
-
-# --- TAB 2: PLAYLIST DOWNLOAD ---
-with tab2:
-    st.subheader("Download Full Playlist")
-    playlist_input = st.text_input(
-        "Paste the YouTube Playlist URL:", 
-        placeholder="https://www.youtube.com/playlist?list=..."
-    )
-    
-    if st.button("Extract Playlist", key="btn_playlist"):
-        if not playlist_input.strip():
-            st.error("Please provide a valid playlist URL.")
-        else:
-            # We treat the single playlist URL as an item in an array, 
-            # but mark is_playlist=True so yt-dlp parses the internal items.
-            run_ytdl_download([playlist_input.strip()], is_playlist=True)
